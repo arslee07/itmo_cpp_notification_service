@@ -65,18 +65,23 @@ std::vector<DueNotification> NotificationService::due(std::int64_t now,
                                                       std::size_t  limit) const {
     std::lock_guard<std::mutex> lk(mu_);
 
+    if (limit == 0) return {};
+
     std::vector<DueNotification> result;
-    result.reserve(pendings_.size());
+    result.reserve(std::min(limit, pendings_.size()));
+
     for (const auto& notification : pendings_) {
         if (notification.send_at > now) {
-            continue;
+            break;
         }
+
         result.push_back(toDue(notification));
+
+        if (result.size() == limit) {
+            break;
+        }
     }
 
-    if (result.size() > limit) {
-        result.resize(limit);
-    }
     return result;
 }
 
