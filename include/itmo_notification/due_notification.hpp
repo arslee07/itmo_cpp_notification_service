@@ -13,8 +13,8 @@ struct DueNotification {
     std::string  template_name;
     std::string  payload;
     std::int64_t send_at{};
-    int          priority{};
     std::int64_t created_at{};
+    int          priority{};
 };
 
 }  // namespace itmo_notification
