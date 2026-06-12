@@ -34,7 +34,7 @@ void NotificationService::add(Notification notification) {
     }
     notification.status = NotificationStatus::Pending;
     auto [pending_it, _] = pendings_.insert(std::move(notification));
-    notifications_[notification.id] = pending_it;
+    notifications_[pending_it->id] = pending_it;
 }
 
 bool NotificationService::cancel(std::string_view id) {
