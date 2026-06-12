@@ -1,4 +1,5 @@
 #include "itmo_notification/notification_service.hpp"
+#include "itmo_notification/notification.hpp"
 
 #include <algorithm>
 
@@ -31,6 +32,7 @@ void NotificationService::add(Notification notification) {
     if (it != notifications_.end()) {
         return;
     }
+    notification.status = NotificationStatus::Pending;
     auto [pending_it, _] = pendings_.insert(std::move(notification));
     notifications_[notification.id] = pending_it;
 }
