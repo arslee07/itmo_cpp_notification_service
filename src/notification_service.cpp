@@ -65,9 +65,13 @@ std::optional<Notification> NotificationService::get(std::string_view id) const 
 
 std::vector<DueNotification> NotificationService::due(std::int64_t now,
                                                       std::size_t  limit) const {
+    std::vector<DueNotification> result;
+    if (limit == 0) {
+        return result;
+    }
+
     std::lock_guard<std::mutex> lk(mu_);
 
-    std::vector<DueNotification> result;
     result.reserve(std::min(limit, pendings_.size()));
 
     for (const auto& notification : pendings_) {
