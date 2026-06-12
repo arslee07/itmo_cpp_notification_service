@@ -15,13 +15,24 @@ struct Notification {
     std::int64_t send_at{};
     int          priority{};
     std::int64_t created_at{};
+};
 
-    bool operator<(const Notification& other) const {
-        if (send_at != other.send_at) return send_at < other.send_at;
-        if (priority != other.priority) return priority > other.priority;
-        if (created_at != other.created_at)
-          return created_at < other.created_at;
-        return id < other.id;
+struct NotificationCompare {
+    using is_transparent = void;
+
+    bool operator()(const Notification& lhs, const Notification& rhs) const {
+        if (lhs.send_at != rhs.send_at) return lhs.send_at < rhs.send_at;
+        if (lhs.priority != rhs.priority) return lhs.priority > rhs.priority;
+        if (lhs.created_at != rhs.created_at) return lhs.created_at < rhs.created_at;
+        return lhs.id < rhs.id;
+    }
+
+    bool operator()(const Notification& lhs, std::int64_t rhs_send_at) const {
+        return lhs.send_at < rhs_send_at;
+    }
+
+    bool operator()(std::int64_t lhs_send_at, const Notification& rhs) const {
+        return lhs_send_at < rhs.send_at;
     }
 };
 

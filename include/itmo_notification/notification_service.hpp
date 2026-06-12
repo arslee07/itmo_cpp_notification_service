@@ -40,7 +40,7 @@ public:
     std::vector<DueNotification> due(std::int64_t now, std::size_t limit) const;
 
 private:
-    std::set<Notification> pendings_;
+    std::set<Notification, NotificationCompare> pendings_;
     std::unordered_map<
         std::string,
         std::ranges::iterator_t<decltype(pendings_)>

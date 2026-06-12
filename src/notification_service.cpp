@@ -64,22 +64,16 @@ std::optional<Notification> NotificationService::get(std::string_view id) const 
 std::vector<DueNotification> NotificationService::due(std::int64_t now,
                                                       std::size_t  limit) const {
     std::lock_guard<std::mutex> lk(mu_);
-
     if (limit == 0) return {};
 
+    auto end_it = pendings_.upper_bound(now);
+    size_t available_count = std::distance(pendings_.begin(), end_it);
+
     std::vector<DueNotification> result;
-    result.reserve(std::min(limit, pendings_.size()));
+    result.reserve(std::min(limit, available_count));
 
-    for (const auto& notification : pendings_) {
-        if (notification.send_at > now) {
-            break;
-        }
-
-        result.push_back(toDue(notification));
-
-        if (result.size() == limit) {
-            break;
-        }
+    for (auto it = pendings_.begin(); it != end_it && result.size() < limit; ++it) {
+        result.push_back(toDue(*it));
     }
 
     return result;
