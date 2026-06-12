@@ -31,7 +31,7 @@ void NotificationService::add(Notification notification) {
     if (it != notifications_.end()) {
         return;
     }
-    auto [pending_it, _] = pendings_.insert(notification);
+    auto [pending_it, _] = pendings_.insert(std::move(notification));
     notifications_[notification.id] = pending_it;
 }
 
