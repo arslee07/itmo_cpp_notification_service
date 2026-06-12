@@ -16,8 +16,8 @@ DueNotification toDue(const Notification& n) {
         n.template_name,
         n.payload,
         n.send_at,
-        n.priority,
         n.created_at,
+        n.priority,
     };
 }
 
