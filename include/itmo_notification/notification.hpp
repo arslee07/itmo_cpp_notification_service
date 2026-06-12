@@ -23,13 +23,7 @@ struct Notification {
     std::int64_t created_at{};
     NotificationStatus status{NotificationStatus::Pending};
 
-    bool operator<(const Notification& other) const {
-        if (send_at != other.send_at) return send_at < other.send_at;
-        if (priority != other.priority) return priority > other.priority;
-        if (created_at != other.created_at)
-          return created_at < other.created_at;
-        return id < other.id;
-    }
+    bool operator<(const Notification& other) const;
 };
 
 }  // namespace itmo_notification
