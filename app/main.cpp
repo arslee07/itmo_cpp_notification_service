@@ -25,18 +25,6 @@ std::int64_t unixNow() {
     return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
 }
 
-std::string statusToString(itmo_notification::NotificationStatus status) {
-    switch (status) {
-        case itmo_notification::NotificationStatus::Pending:
-            return "pending";
-        case itmo_notification::NotificationStatus::Sent:
-            return "sent";
-        case itmo_notification::NotificationStatus::Cancelled:
-            return "cancelled";
-    }
-    return "unknown";
-}
-
 itmo_notification::Notification parseNotification(const json& j) {
     itmo_notification::Notification n;
     n.id            = j.value("id", std::string{});
@@ -62,7 +50,6 @@ json notificationToJson(const itmo_notification::Notification& n) {
         {"send_at", n.send_at},
         {"priority", n.priority},
         {"created_at", n.created_at},
-        {"status", statusToString(n.status)},
     };
 }
 

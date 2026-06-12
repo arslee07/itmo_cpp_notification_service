@@ -1,7 +1,6 @@
 #include "itmo_notification/notification_service.hpp"
 
 #include <algorithm>
-#include <utility>
 
 namespace itmo_notification {
 
@@ -28,9 +27,12 @@ NotificationService::~NotificationService() = default;
 
 void NotificationService::add(Notification notification) {
     std::lock_guard<std::mutex> lk(mu_);
-    notification.status = NotificationStatus::Pending;
-    schedule_.push_back(notification.id);
-    notifications_[notification.id] = std::move(notification);
+    auto it = notifications_.find(notification.id);
+    if (it != notifications_.end()) {
+        return;
+    }
+    auto [pending_it, _] = pendings_.insert(notification);
+    notifications_[notification.id] = pending_it;
 }
 
 bool NotificationService::cancel(std::string_view id) {
@@ -40,21 +42,14 @@ bool NotificationService::cancel(std::string_view id) {
     if (it == notifications_.end()) {
         return false;
     }
-    cancelled_.insert(key);
-    it->second.status = NotificationStatus::Cancelled;
+    auto pending_it = it->second;
+    notifications_.erase(it);
+    pendings_.erase(pending_it);
     return true;
 }
 
 bool NotificationService::markSent(std::string_view id) {
-    std::lock_guard<std::mutex> lk(mu_);
-    const auto key = std::string(id);
-    auto it = notifications_.find(key);
-    if (it == notifications_.end() || cancelled_.count(key) != 0) {
-        return false;
-    }
-    sent_.insert(key);
-    it->second.status = NotificationStatus::Sent;
-    return true;
+    return cancel(id);
 }
 
 std::optional<Notification> NotificationService::get(std::string_view id) const {
@@ -63,7 +58,7 @@ std::optional<Notification> NotificationService::get(std::string_view id) const 
     if (it == notifications_.end()) {
         return std::nullopt;
     }
-    return it->second;
+    return *it->second;
 }
 
 std::vector<DueNotification> NotificationService::due(std::int64_t now,
@@ -71,27 +66,13 @@ std::vector<DueNotification> NotificationService::due(std::int64_t now,
     std::lock_guard<std::mutex> lk(mu_);
 
     std::vector<DueNotification> result;
-    result.reserve(schedule_.size());
-    for (const auto& id : schedule_) {
-        auto it = notifications_.find(id);
-        if (it == notifications_.end()) {
+    result.reserve(pendings_.size());
+    for (const auto& notification : pendings_) {
+        if (notification.send_at > now) {
             continue;
         }
-        const auto& n = it->second;
-        if (n.send_at > now) {
-            continue;
-        }
-        if (cancelled_.count(id) != 0 || sent_.count(id) != 0) {
-            continue;
-        }
-        result.push_back(toDue(n));
+        result.push_back(toDue(notification));
     }
-
-    std::sort(result.begin(), result.end(), [](const DueNotification& a,
-                                               const DueNotification& b) {
-        if (a.send_at != b.send_at) return a.send_at < b.send_at;
-        return a.id < b.id;
-    });
 
     if (result.size() > limit) {
         result.resize(limit);
