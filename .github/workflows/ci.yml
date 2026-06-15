@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Install depdendencies
+      run: python3 -m pip install aiohttp requests
     - name: Generate Dataset
       run: python3 scripts/gen_dataset.py
     - name: Configure
