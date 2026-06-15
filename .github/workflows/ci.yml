@@ -19,21 +19,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
     - name: Install depdendencies
       run: python3 -m pip install aiohttp requests
+
     - name: Generate Dataset
       run: python3 scripts/gen_dataset.py
+
     - name: Configure
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
     - name: Build
       run: cmake --build build -j
+
     - name: Run tests
-      run: ./build/notification_tests
+      run: |
+        echo "# Tests" >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
+        ./build/notification_tests >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
+
     - name: Run benchmarks
-      run: ./build/notification_bench
+      run: |
+        echo "# Benchmarks" >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
+        ./build/notification_bench >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
+
     - name: Run service in background
       run: ./build/notification_service &
+
     - name: Preload dataset
       run: python3 scripts/preload.py --url http://localhost:8080
+
     - name: Run load test
-      run: python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50
+      run: |
+        echo "# Tests" >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
+        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> $GITHUB_STEP_SUMMARY
+        echo "```" >> $GITHUB_STEP_SUMMARY
