@@ -20,11 +20,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Prepare summary
-      run: |
-        SUMMARY="$HOME/summary.md"
-        touch "$SUMMARY"
-
     - name: Install depdendencies
       run: python3 -m pip install aiohttp requests
 
@@ -39,17 +34,17 @@ jobs:
 
     - name: Run tests
       run: |
-        echo "# Tests" >> "$SUMMARY"
-        echo "```" >> "$SUMMARY"
-        ./build/notification_tests >> "$SUMMARY"
-        echo "```" >> "$SUMMARY"
+        echo "# Tests" >> summary.md
+        echo "```" >> summary.md
+        ./build/notification_tests >> summary.md
+        echo "```" >> summary.md
 
     - name: Run benchmarks
       run: |
-        echo "# Benchmarks" >> "$SUMMARY"
-        echo "```" >> "$SUMMARY"
-        ./build/notification_bench >> "$SUMMARY"
-        echo "```" >> "$SUMMARY"
+        echo "# Benchmarks" >> summary.md
+        echo "```" >> summary.md
+        ./build/notification_bench >> summary.md
+        echo "```" >> summary.md
 
     - name: Run service in background
       run: ./build/notification_service &
@@ -59,10 +54,10 @@ jobs:
 
     - name: Run load test
       run: |
-        echo "# Tests" >> "$SUMMARY"
-        echo "```" >> "$SUMMARY"
-        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> "$SUMMARY"
-        echo "```" >> "$SUMMARY"
+        echo "# Tests" >> summary.md
+        echo "```" >> summary.md
+        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> summary.md
+        echo "```" >> summary.md
 
     - name: Publish summary
-      run: cp $SUMMARY "$GITHUB_STEP_SUMMARY"
+      run: cat summary.md > "$GITHUB_STEP_SUMMARY"
