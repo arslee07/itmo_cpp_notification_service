@@ -49,7 +49,13 @@ class NotificationService
 
     static std::size_t GetShardIdx(std::string_view id)
     {
-        return std::hash<std::string_view> {}(id) & (ShardsSize - 1);
+        std::size_t hash = 2166136261ULL;
+        for (char c : id)
+        {
+            hash ^= static_cast<size_t>(c);
+            hash *= 16777619ULL;
+        }
+        return hash & (ShardsSize - 1);
     }
 
     std::set<Notification> pendings_;
