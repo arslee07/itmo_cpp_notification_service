@@ -4,16 +4,6 @@ on:
   repository_dispatch:
   workflow_dispatch:
 
-  # TODO: delete before merge!!!
-  push:
-    branches:
-      - "ci"
-  pull_request:
-    branches:
-      - "main"
-    paths:
-      - ".github/workflows/ci.yml"
-
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -54,7 +44,7 @@ jobs:
 
     - name: Run load test
       run: |
-        echo '# Tests' >> $GITHUB_STEP_SUMMARY
+        echo '# Load tests' >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
