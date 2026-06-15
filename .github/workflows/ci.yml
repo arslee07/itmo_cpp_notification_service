@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Generate Dataset
+      run: python3 scripts/gen_dataset.py
     - name: Configure
       run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
     - name: Build
@@ -27,3 +29,9 @@ jobs:
       run: ./build/notification_tests
     - name: Run benchmarks
       run: ./build/notification_bench
+    - name: Run service in background
+      run: ./build/notification_service &
+    - name: Preload dataset
+      run: python3 scripts/preload.py --url http://localhost:8080
+    - name: Run load test
+      run: python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50
