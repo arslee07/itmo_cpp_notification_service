@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <mutex>
 
 #include "itmo_notification/notification.hpp"
 #include "itmo_notification/notification_service.hpp"
