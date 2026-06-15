@@ -20,6 +20,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Prepare summary
+      run: |
+        SUMMARY="$HOME/summary.md"
+        touch "$SUMMARY"
+
     - name: Install depdendencies
       run: python3 -m pip install aiohttp requests
 
@@ -34,17 +39,17 @@ jobs:
 
     - name: Run tests
       run: |
-        echo "# Tests" >> "$GITHUB_STEP_SUMMARY"
-        echo "```" >> "$GITHUB_STEP_SUMMARY"
-        ./build/notification_tests >> "$GITHUB_STEP_SUMMARY"
-        echo "```" >> "$GITHUB_STEP_SUMMARY"
+        echo "# Tests" >> "$SUMMARY"
+        echo "```" >> "$SUMMARY"
+        ./build/notification_tests >> "$SUMMARY"
+        echo "```" >> "$SUMMARY"
 
     - name: Run benchmarks
       run: |
-        echo "# Benchmarks" >> "$GITHUB_STEP_SUMMARY"
-        echo "```" >> "$GITHUB_STEP_SUMMARY"
-        ./build/notification_bench >> "$GITHUB_STEP_SUMMARY"
-        echo "```" >> "$GITHUB_STEP_SUMMARY"
+        echo "# Benchmarks" >> "$SUMMARY"
+        echo "```" >> "$SUMMARY"
+        ./build/notification_bench >> "$SUMMARY"
+        echo "```" >> "$SUMMARY"
 
     - name: Run service in background
       run: ./build/notification_service &
@@ -54,7 +59,10 @@ jobs:
 
     - name: Run load test
       run: |
-        echo "# Tests" >> "$GITHUB_STEP_SUMMARY"
-        echo "```" >> "$GITHUB_STEP_SUMMARY"
-        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> "$GITHUB_STEP_SUMMARY"
-        echo "```" >> "$GITHUB_STEP_SUMMARY"
+        echo "# Tests" >> "$SUMMARY"
+        echo "```" >> "$SUMMARY"
+        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> "$SUMMARY"
+        echo "```" >> "$SUMMARY"
+
+    - name: Publish summary
+      run: cp $SUMMARY "$GITHUB_STEP_SUMMARY"
