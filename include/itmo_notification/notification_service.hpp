@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <shared_mutex>
 #include <optional>
 #include <set>
