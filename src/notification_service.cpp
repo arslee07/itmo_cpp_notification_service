@@ -2,6 +2,7 @@
 #include "itmo_notification/notification.hpp"
 
 #include <algorithm>
+#include <queue>
 
 namespace itmo_notification {
 
@@ -26,27 +27,58 @@ DueNotification toDue(const Notification& n) {
 NotificationService::NotificationService()  = default;
 NotificationService::~NotificationService() = default;
 
+NotificationService::Shard& NotificationService::GetShard(std::string_view id) noexcept {
+    size_t idx = IdHash{}(id) & (SHARD_AMOUNT - 1);
+    return shards_[idx];
+}
+
+const NotificationService::Shard& NotificationService::GetShard(std::string_view id) const noexcept {
+    size_t idx = IdHash{}(id) & (SHARD_AMOUNT - 1);
+    return shards_[idx];
+}
+
 void NotificationService::add(Notification notification) {
-    std::lock_guard<std::mutex> lk(mu_);
-    auto it = notifications_.find(notification.id);
-    if (it != notifications_.end()) {
-        return;
+    auto& shard = GetShard(notification.id);
+    {
+        std::shared_lock<std::shared_mutex> lk(shard.mu);
+        auto it = shard.notifications.find(notification.id);
+        if (it != shard.notifications.end()) {
+            return;
+        }
     }
-    notification.status = NotificationStatus::Pending;
-    auto [pending_it, _] = pendings_.insert(std::move(notification));
-    notifications_[pending_it->id] = pending_it;
+
+    {
+        std::unique_lock<std::shared_mutex> lk(shard.mu);
+        auto it = shard.notifications.find(notification.id);
+        if (it != shard.notifications.end()) {
+            return;
+        }
+        notification.status = NotificationStatus::Pending;
+        auto [pending_it, _] = shard.pendings.insert(std::move(notification));
+        shard.notifications[pending_it->id] = pending_it;
+    }
 }
 
 bool NotificationService::cancel(std::string_view id) {
-    std::lock_guard<std::mutex> lk(mu_);
-    const auto key = std::string(id);
-    auto it = notifications_.find(key);
-    if (it == notifications_.end()) {
-        return false;
+    auto& shard = GetShard(id);
+    {
+        std::shared_lock<std::shared_mutex> lk(shard.mu);
+        auto it = shard.notifications.find(id);
+        if (it == shard.notifications.end()) {
+            return false;
+        }
     }
-    auto pending_it = it->second;
-    notifications_.erase(it);
-    pendings_.erase(pending_it);
+
+    {
+        std::unique_lock<std::shared_mutex> lk(shard.mu);
+        auto it = shard.notifications.find(id);
+        if (it == shard.notifications.end()) {
+            return false;
+        }
+        shard.pendings.erase(it->second);
+        shard.notifications.erase(it);
+    }
+
     return true;
 }
 
@@ -55,9 +87,10 @@ bool NotificationService::markSent(std::string_view id) {
 }
 
 std::optional<Notification> NotificationService::get(std::string_view id) const {
-    std::lock_guard<std::mutex> lk(mu_);
-    auto it = notifications_.find(std::string(id));
-    if (it == notifications_.end()) {
+    const auto& shard = GetShard(id);
+    std::shared_lock<std::shared_mutex> lk(shard.mu);
+    auto it = shard.notifications.find(id);
+    if (it == shard.notifications.end()) {
         return std::nullopt;
     }
     return *it->second;
@@ -65,24 +98,43 @@ std::optional<Notification> NotificationService::get(std::string_view id) const 
 
 std::vector<DueNotification> NotificationService::due(std::int64_t now,
                                                       std::size_t  limit) const {
-    std::vector<DueNotification> result;
     if (limit == 0) {
-        return result;
+        return {};
     }
+    std::vector<DueNotification> result;
+    result.reserve(limit);
 
-    std::lock_guard<std::mutex> lk(mu_);
-
-    result.reserve(std::min(limit, pendings_.size()));
-
-    for (const auto& notification : pendings_) {
-        if (notification.send_at > now) {
-            break;
+    {
+        std::array<std::shared_lock<std::shared_mutex>, SHARD_AMOUNT> lks;
+        for (size_t i = 0; i < SHARD_AMOUNT; ++i) {
+            lks[i] = std::shared_lock<std::shared_mutex>(shards_[i].mu);
         }
-
-        result.push_back(toDue(notification));
-
-        if (result.size() == limit) {
-            break;
+    
+        struct HeapItem {
+            std::ranges::iterator_t<decltype(std::declval<Shard>().pendings)> it;
+            size_t idx;
+        
+            bool operator>(const HeapItem& other) const noexcept {
+                return *other.it < *it;
+            }
+        };
+    
+        std::priority_queue<HeapItem, std::vector<HeapItem>, std::greater<HeapItem>> q;
+        for (size_t i = 0; i < SHARD_AMOUNT; ++i) {
+            auto it = shards_[i].pendings.begin();
+            if (it != shards_[i].pendings.end() && it->send_at <= now) {
+                q.push(HeapItem{it, i});
+            }
+        }
+    
+        while (result.size() < limit && !q.empty()) {
+            auto [it, idx] = q.top();
+            q.pop();
+            result.push_back(toDue(*it));
+            ++it;
+            if (it != shards_[idx].pendings.end() && it->send_at <= now) {
+                q.push(HeapItem{it, idx});
+            }
         }
     }
 
