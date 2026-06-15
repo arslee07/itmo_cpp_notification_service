@@ -1,0 +1,15 @@
+name: CI
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Configure
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    - name: Build
+      run: cmake --build build -j
+    - name: Run tests
+      run: ./build/notification_tests
+    - name: Run benchmarks
+      run: ./build/notification_bench
