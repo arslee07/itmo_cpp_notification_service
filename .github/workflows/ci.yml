@@ -18,7 +18,7 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Install depdendencies
       run: python3 -m pip install aiohttp requests
@@ -34,17 +34,17 @@ jobs:
 
     - name: Run tests
       run: |
-        echo "# Tests" >> summary.md
-        echo "```" >> summary.md
-        ./build/notification_tests >> summary.md
-        echo "```" >> summary.md
+        echo '# Tests' >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        ./build/notification_tests >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Run benchmarks
       run: |
-        echo "# Benchmarks" >> summary.md
-        echo "```" >> summary.md
-        ./build/notification_bench >> summary.md
-        echo "```" >> summary.md
+        echo '# Benchmarks' >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        ./build/notification_bench >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: Run service in background
       run: ./build/notification_service &
@@ -54,10 +54,7 @@ jobs:
 
     - name: Run load test
       run: |
-        echo "# Tests" >> summary.md
-        echo "```" >> summary.md
-        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> summary.md
-        echo "```" >> summary.md
-
-    - name: Publish summary
-      run: cat summary.md > "$GITHUB_STEP_SUMMARY"
+        echo '# Tests' >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        python3 scripts/load_test.py --url http://localhost:8080 --duration 60s --concurrency 50 >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
