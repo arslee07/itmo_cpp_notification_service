@@ -40,7 +40,7 @@ const NotificationService::Shard& NotificationService::GetShard(std::string_view
 void NotificationService::add(Notification notification) {
     auto& shard = GetShard(notification.id);
     {
-        std::unique_lock<std::shared_mutex> lk(shard.mu);
+        std::unique_lock<std::mutex> lk(shard.mu);
         auto it = shard.notifications.find(notification.id);
         if (it != shard.notifications.end()) {
             return;
@@ -54,7 +54,7 @@ void NotificationService::add(Notification notification) {
 bool NotificationService::cancel(std::string_view id) {
     auto& shard = GetShard(id);
     {
-        std::unique_lock<std::shared_mutex> lk(shard.mu);
+        std::unique_lock<std::mutex> lk(shard.mu);
         auto it = shard.notifications.find(id);
         if (it == shard.notifications.end()) {
             return false;
@@ -72,7 +72,7 @@ bool NotificationService::markSent(std::string_view id) {
 
 std::optional<Notification> NotificationService::get(std::string_view id) const {
     const auto& shard = GetShard(id);
-    std::shared_lock<std::shared_mutex> lk(shard.mu);
+    std::unique_lock<std::mutex> lk(shard.mu);
     auto it = shard.notifications.find(id);
     if (it == shard.notifications.end()) {
         return std::nullopt;
@@ -89,9 +89,9 @@ std::vector<DueNotification> NotificationService::due(std::int64_t now,
     result.reserve(limit);
 
     {
-        std::array<std::shared_lock<std::shared_mutex>, SHARD_AMOUNT> lks;
+        std::array<std::unique_lock<std::mutex>, SHARD_AMOUNT> lks;
         for (size_t i = 0; i < SHARD_AMOUNT; ++i) {
-            lks[i] = std::shared_lock<std::shared_mutex>(shards_[i].mu);
+            lks[i] = std::unique_lock<std::mutex>(shards_[i].mu);
         }
     
         struct HeapItem {
