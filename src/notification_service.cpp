@@ -40,14 +40,6 @@ const NotificationService::Shard& NotificationService::GetShard(std::string_view
 void NotificationService::add(Notification notification) {
     auto& shard = GetShard(notification.id);
     {
-        std::shared_lock<std::shared_mutex> lk(shard.mu);
-        auto it = shard.notifications.find(notification.id);
-        if (it != shard.notifications.end()) {
-            return;
-        }
-    }
-
-    {
         std::unique_lock<std::shared_mutex> lk(shard.mu);
         auto it = shard.notifications.find(notification.id);
         if (it != shard.notifications.end()) {
@@ -61,14 +53,6 @@ void NotificationService::add(Notification notification) {
 
 bool NotificationService::cancel(std::string_view id) {
     auto& shard = GetShard(id);
-    {
-        std::shared_lock<std::shared_mutex> lk(shard.mu);
-        auto it = shard.notifications.find(id);
-        if (it == shard.notifications.end()) {
-            return false;
-        }
-    }
-
     {
         std::unique_lock<std::shared_mutex> lk(shard.mu);
         auto it = shard.notifications.find(id);
