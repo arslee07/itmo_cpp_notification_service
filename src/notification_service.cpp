@@ -124,6 +124,8 @@ std::vector<DueNotification> NotificationService::due(std::int64_t now,
             auto it = shards_[i].pendings.begin();
             if (it != shards_[i].pendings.end() && it->send_at <= now) {
                 q.push(HeapItem{it, i});
+            } else {
+                lks[i].unlock();
             }
         }
     
@@ -134,6 +136,8 @@ std::vector<DueNotification> NotificationService::due(std::int64_t now,
             ++it;
             if (it != shards_[idx].pendings.end() && it->send_at <= now) {
                 q.push(HeapItem{it, idx});
+            } else {
+                lks[idx].unlock();
             }
         }
     }
