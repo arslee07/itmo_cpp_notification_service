@@ -62,7 +62,7 @@ private:
             std::ranges::iterator_t<decltype(pendings)>,
             IdHash, std::equal_to<>
         > notifications;
-        mutable std::mutex mu;
+        mutable std::shared_mutex mu;
     };
 
     Shard& GetShard(std::string_view id) noexcept;
