@@ -21,28 +21,18 @@ NotificationService::NotificationService() = default;
 NotificationService::~NotificationService() = default;
 
 void NotificationService::add(Notification notification) {
-  {
-    std::shared_lock<std::shared_mutex> lk(mu_);
-    auto it = notifications_.find(notification.id);
-    if (it != notifications_.end()) {
-      return;
-    }
-  }
-  {
-    std::unique_lock lk(mu_);
-    auto it = notifications_.find(notification.id);
-    if (it != notifications_.end()) {
-      return;
-    }
+  std::unique_lock lk(mu_);
 
-    notification.status = NotificationStatus::Pending;
-    auto [pending_it, inserted] = pendings_.insert(std::move(notification));
-    if (!inserted) {
-      return;
-    }
-
-    notifications_.emplace(pending_it->id, pending_it);
+  if (notifications_.contains(notification.id)) {
+    return;
   }
+  notification.status = NotificationStatus::Pending;
+  auto [pending_it, inserted] = pendings_.insert(std::move(notification));
+  if (!inserted) {
+    return;
+  }
+
+  notifications_.emplace(pending_it->id, pending_it);
 }
 
 bool NotificationService::cancel(std::string_view id) {
@@ -81,15 +71,11 @@ std::vector<DueNotification> NotificationService::due(std::int64_t now,
   result.reserve(std::min(limit, pendings_.size()));
 
   for (const auto& notification : pendings_) {
-    if (notification.send_at > now) {
+    if (notification.send_at > now || result.size() == limit) {
       break;
     }
 
     result.push_back(toDue(notification));
-
-    if (result.size() == limit) {
-      break;
-    }
   }
 
   return result;
