@@ -3,25 +3,28 @@
 #include <cstdint>
 #include <string>
 
-namespace itmo_notification {
+namespace itmo_notification
+{
 
-enum class NotificationStatus {
+enum class NotificationStatus
+{
     Pending,
     Sent,
     Cancelled,
 };
 
-struct Notification {
-    std::string  id;
-    std::string  user_id;
-    std::string  channel;
-    std::string  recipient;
-    std::string  template_name;
-    std::string  payload;
-    std::int64_t send_at{};
-    std::int64_t created_at{};
-    int          priority{};
-    NotificationStatus status{NotificationStatus::Pending};
+struct Notification
+{
+    std::string id;
+    std::string user_id;
+    std::string channel;
+    std::string recipient;
+    std::string template_name;
+    std::string payload;
+    std::int64_t send_at {};
+    std::int64_t created_at {};
+    int priority {};
+    NotificationStatus status {NotificationStatus::Pending};
 
     bool operator<(const Notification& other) const;
 };
