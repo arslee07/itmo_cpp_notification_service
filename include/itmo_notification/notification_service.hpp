@@ -48,23 +48,10 @@ class NotificationService
                                      std::size_t limit) const;
 
   private:
-    struct SetItem
+    struct TaskState
     {
-        std::string id;
-        std::int64_t send_at;
-        std::int64_t created_at;
-        int priority;
-
-        bool operator<(const SetItem& other) const noexcept
-        {
-            if (send_at != other.send_at)
-                return send_at < other.send_at;
-            if (priority != other.priority)
-                return priority > other.priority;
-            if (created_at != other.created_at)
-                return created_at < other.created_at;
-            return id < other.id;
-        }
+        std::atomic<bool> is_active {true};
+        Notification n;
     };
 
     struct Hasher
@@ -86,7 +73,7 @@ class NotificationService
     {
         mutable std::shared_mutex mu;
         std::unordered_map<std::string,
-                           Notification,
+                           std::shared_ptr<TaskState>,
                            Hasher,
                            std::equal_to<>>
             map;
@@ -99,6 +86,28 @@ class NotificationService
     {
         return Hasher {}(id) & (SHARDS_COUNT - 1);
     }
+
+    struct SetItem
+    {
+        std::string id;
+        std::shared_ptr<TaskState> task;
+        std::int64_t send_at;
+        std::int64_t created_at;
+        int priority;
+
+        bool operator<(const SetItem& other) const noexcept
+        {
+            if (send_at != other.send_at)
+                return send_at < other.send_at;
+            if (priority != other.priority)
+                return priority > other.priority;
+            if (created_at != other.created_at)
+                return created_at < other.created_at;
+            if (id != other.id)
+                return id < other.id;
+            return task.get() < other.task.get();
+        }
+    };
 
     mutable std::mutex set_mu_;
     mutable std::set<SetItem> pendings_;

@@ -29,39 +29,37 @@ void NotificationService::add(Notification notification)
 {
     auto shard_idx = get_shard_idx(notification.id);
     auto& shard = shards_[shard_idx];
-    std::optional<SetItem> stale_item;
+    auto task = std::make_shared<TaskState>();
+    notification.status = NotificationStatus::Pending;
+    task->n = notification;
     {
         std::unique_lock shard_lock(shard.mu);
         auto it = shard.map.find(notification.id);
         if (it != shard.map.end())
         {
-            if (it->second.status == NotificationStatus::Pending)
-            {
-                return;
-            }
-            stale_item = SetItem {it->second.id,
-                                  it->second.send_at,
-                                  it->second.created_at,
-                                  it->second.priority};
+            return;
         }
-        notification.status = NotificationStatus::Pending;
-        shard.map.insert_or_assign(notification.id, notification);
+        shard.map[notification.id] = task;
     }
     {
         std::lock_guard set_lock(set_mu_);
-        if (stale_item)
-        {
-            pendings_.erase(*stale_item);
-        }
         pendings_.insert({notification.id,
+                          task,
                           notification.send_at,
                           notification.created_at,
                           notification.priority});
-        if (notification.send_at <
-            earliest_send_at_.load(std::memory_order_relaxed))
+        auto current_min =
+            earliest_send_at_.load(std::memory_order_relaxed);
+        while (notification.send_at < current_min)
         {
-            earliest_send_at_.store(notification.send_at,
-                                    std::memory_order_release);
+            if (earliest_send_at_.compare_exchange_weak(
+                    current_min,
+                    notification.send_at,
+                    std::memory_order_release,
+                    std::memory_order_relaxed))
+            {
+                break;
+            }
         }
     }
 }
@@ -72,12 +70,12 @@ bool NotificationService::cancel(std::string_view id)
     auto& shard = shards_[shard_idx];
     std::unique_lock shard_lock(shard.mu);
     auto it = shard.map.find(id);
-    if (it == shard.map.end() ||
-        it->second.status != NotificationStatus::Pending)
+    if (it == shard.map.end())
     {
         return false;
     }
-    it->second.status = NotificationStatus::Cancelled;
+    it->second->is_active.store(false, std::memory_order_relaxed);
+    shard.map.erase(it);
     return true;
 }
 
@@ -87,12 +85,12 @@ bool NotificationService::markSent(std::string_view id)
     auto& shard = shards_[shard_idx];
     std::unique_lock shard_lock(shard.mu);
     auto it = shard.map.find(id);
-    if (it == shard.map.end() ||
-        it->second.status != NotificationStatus::Pending)
+    if (it == shard.map.end())
     {
         return false;
     }
-    it->second.status = NotificationStatus::Sent;
+    it->second->is_active.store(false, std::memory_order_relaxed);
+    shard.map.erase(it);
     return true;
 }
 
@@ -103,12 +101,11 @@ NotificationService::get(std::string_view id) const
     auto& shard = shards_[shard_idx];
     std::shared_lock shard_lock(shard.mu);
     auto it = shard.map.find(id);
-    if (it == shard.map.end() ||
-        it->second.status != NotificationStatus::Pending)
+    if (it == shard.map.end())
     {
         return std::nullopt;
     }
-    return it->second;
+    return it->second->n;
 }
 
 std::vector<DueNotification>
@@ -131,23 +128,12 @@ NotificationService::due(std::int64_t now, std::size_t limit) const
         {
             break;
         }
-        auto shard_idx = get_shard_idx(it->id);
-        auto& shard = shards_[shard_idx];
-        std::optional<Notification> actual_n;
-        {
-            std::shared_lock shard_lock(shard.mu);
-            auto map_it = shard.map.find(it->id);
-            if (map_it != shard.map.end())
-            {
-                actual_n = map_it->second;
-            }
-        }
-        if (!actual_n || actual_n->status != NotificationStatus::Pending)
+        if (!it->task->is_active.load(std::memory_order_relaxed))
         {
             it = pendings_.erase(it);
             continue;
         }
-        result.push_back(toDue(*actual_n));
+        result.push_back(toDue(it->task->n));
         ++it;
         if (result.size() == limit)
         {
