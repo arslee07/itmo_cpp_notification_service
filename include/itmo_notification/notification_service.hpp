@@ -3,12 +3,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <shared_mutex>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include <array>
 
 #include "itmo_notification/due_notification.hpp"
 #include "itmo_notification/notification.hpp"
@@ -40,13 +42,34 @@ public:
     std::vector<DueNotification> due(std::int64_t now, std::size_t limit) const;
 
 private:
-    std::set<Notification> pendings_;
-    std::unordered_map<
-        std::string,
-        std::ranges::iterator_t<decltype(pendings_)>
-    > notifications_;
+    struct IdHash {
+        using is_transparent = void;
 
-    mutable std::mutex mu_;
+        size_t operator()(const std::string& id) const noexcept {
+            return std::hash<std::string>{}(id);
+        }
+
+        size_t operator()(std::string_view id) const noexcept {
+            return std::hash<std::string_view>{}(id);
+        }
+    };
+
+    static constexpr size_t SHARD_AMOUNT = 16;
+    struct alignas(64) Shard {
+        std::set<Notification> pendings;
+        std::unordered_map<
+            std::string,
+            std::ranges::iterator_t<decltype(pendings)>,
+            IdHash, std::equal_to<>
+        > notifications;
+        mutable std::shared_mutex mu;
+    };
+
+    Shard& GetShard(std::string_view id) noexcept;
+
+    const Shard& GetShard(std::string_view id) const noexcept;
+
+    std::array<Shard, 16> shards_;
 };
 
 }  // namespace itmo_notification
