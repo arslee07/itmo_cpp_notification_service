@@ -44,6 +44,7 @@ itmo_notification::Notification parseNotification(const json& j) {
     n.send_at       = j.value("send_at", std::int64_t{0});
     n.priority      = j.value("priority", 0);
     n.created_at    = j.value("created_at", std::int64_t{0});
+    n.attempts      = j.value("attempts", 0);
     return n;
 }
 
@@ -142,6 +143,20 @@ static void BM_MarkSent(benchmark::State& state) {
 }
 BENCHMARK(BM_MarkSent)->Unit(benchmark::kMicrosecond);
 
+static void BM_Fail_Throughput(benchmark::State& state) {
+    auto service = warmMutableService();
+    const auto& ids = dataset().sample_ids;
+    std::int64_t now = dataset().due_now;
+    std::size_t i = 0;
+    for (auto _ : state) {
+        const auto& id = ids[i % ids.size()];
+        auto ok = service->fail(id, now);
+        benchmark::DoNotOptimize(ok);
+        ++i;
+    }
+}
+BENCHMARK(BM_Fail_Throughput)->Unit(benchmark::kMicrosecond);
+
 static void BM_CancelledDoNotPoisonDue(benchmark::State& state) {
     auto service = warmMutableService();
     const auto& d = dataset();
@@ -155,3 +170,18 @@ static void BM_CancelledDoNotPoisonDue(benchmark::State& state) {
     }
 }
 BENCHMARK(BM_CancelledDoNotPoisonDue)->Unit(benchmark::kMicrosecond);
+
+static void BM_Due_WithRetries(benchmark::State& state) {
+    auto service = warmMutableService();
+    const auto& d = dataset();
+
+    for (std::size_t i = 0; i < d.sample_ids.size() / 2; ++i) {
+        service->fail(d.sample_ids[i], d.due_now);
+    }
+
+    for (auto _ : state) {
+        auto due = service->due(d.due_now + 10, 100);
+        benchmark::DoNotOptimize(due);
+    }
+}
+BENCHMARK(BM_Due_WithRetries)->Unit(benchmark::kMicrosecond);

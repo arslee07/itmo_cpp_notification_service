@@ -69,6 +69,7 @@ def main() -> int:
                 "send_at": send_at,
                 "priority": rng.randint(0, 9),
                 "created_at": base_ts - rng.randint(0, 24 * 3600),
+                "attempts": rng.randint(0, 30),
             }
             f.write(json.dumps(doc, ensure_ascii=False))
             f.write("\n")
