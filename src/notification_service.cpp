@@ -19,6 +19,7 @@ DueNotification toDue(const Notification& n) {
         n.send_at,
         n.created_at,
         n.priority,
+        n.attempts,
     };
 }
 
@@ -84,6 +85,39 @@ bool NotificationService::cancel(std::string_view id) {
 
 bool NotificationService::markSent(std::string_view id) {
     return cancel(id);
+}
+
+bool NotificationService::fail(std::string_view id, std::int64_t now) {
+    auto& shard = GetShard(id);
+    {
+        std::shared_lock<std::shared_mutex> lk(shard.mu);
+        auto it = shard.notifications.find(id);
+        if (it == shard.notifications.end()) {
+            return false;
+        }
+    }
+
+    {
+        std::unique_lock<std::shared_mutex> lk(shard.mu);
+        auto it = shard.notifications.find(id);
+        if (it == shard.notifications.end()) {
+            return false;
+        }
+
+        auto pending_it = it->second;
+        auto node = shard.pendings.extract(pending_it);
+
+        node.value().attempts += 1;
+        int limited_attempts = std::min(node.value().attempts, 30);
+        std::int64_t delay = 1LL << (limited_attempts - 1);
+        node.value().send_at = now + delay;
+        node.value().status = NotificationStatus::Pending;
+
+        auto insert_res = shard.pendings.insert(std::move(node));
+        it->second = insert_res.position;
+    }
+
+    return true;
 }
 
 std::optional<Notification> NotificationService::get(std::string_view id) const {

@@ -35,6 +35,9 @@ public:
     // POST /v1/notifications/{id}/sent
     bool markSent(std::string_view id);
 
+    // POST /v1/notifications/{id}/failed
+    bool fail(std::string_view id, std::int64_t now);
+
     // GET /v1/notifications/{id}
     std::optional<Notification> get(std::string_view id) const;
 

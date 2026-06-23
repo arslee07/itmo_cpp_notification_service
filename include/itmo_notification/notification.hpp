@@ -22,6 +22,7 @@ struct Notification {
     std::int64_t created_at{};
     int          priority{};
     NotificationStatus status{NotificationStatus::Pending};
+    int          attempts{};
 
     bool operator<(const Notification& other) const;
 };

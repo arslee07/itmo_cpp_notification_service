@@ -143,6 +143,54 @@ TEST(NotificationServiceTest, ConcurrentAddSentAndDueIsSafe) {
     EXPECT_GT(total_seen.load(), 0);
 }
 
+TEST(NotificationServiceTest, FailIncrementsAttemptsAndReschedules) {
+    NotificationService service;
+    service.add(makeNotification("n1", 100));
+
+    auto n_initial = service.get("n1");
+    ASSERT_TRUE(n_initial.has_value());
+    EXPECT_EQ(n_initial->attempts, 0);
+
+    ASSERT_TRUE(service.fail("n1", 100));
+    EXPECT_TRUE(service.due(100, 10).empty());
+
+    const auto due = service.due(101, 10);
+    ASSERT_EQ(due.size(), 1u);
+    EXPECT_EQ(due[0].id, "n1");
+    EXPECT_EQ(due[0].attempts, 1);
+
+    const auto n_after = service.get("n1");
+    ASSERT_TRUE(n_after.has_value());
+    EXPECT_EQ(n_after->attempts, 1);
+}
+
+
+TEST(NotificationServiceTest, FailAppliesExponentialBackoff) {
+    NotificationService service;
+
+    service.add(makeNotification("n1", 100));
+    ASSERT_TRUE(service.fail("n1", 100));
+    ASSERT_TRUE(service.fail("n1", 101));
+    EXPECT_TRUE(service.due(102, 10).empty());
+
+    const auto due_after_two = service.due(103, 10);
+    ASSERT_EQ(due_after_two.size(), 1u);
+    EXPECT_EQ(due_after_two[0].id, "n1");
+    EXPECT_EQ(due_after_two[0].attempts, 2);
+    ASSERT_TRUE(service.fail("n1", 103));
+    EXPECT_TRUE(service.due(106, 10).empty());
+
+    const auto due_after_three = service.due(107, 10);
+    ASSERT_EQ(due_after_three.size(), 1u);
+    EXPECT_EQ(due_after_three[0].id, "n1");
+    EXPECT_EQ(due_after_three[0].attempts, 3);
+}
+
+TEST(NotificationServiceTest, FailNonExistentReturnsFalse) {
+    NotificationService service;
+    EXPECT_FALSE(service.fail("non-existent", 100));
+}
+
 // -----------------------------------------------------------------------------
 // Помечены DISABLED_ — должны включиться и проходить после доработки сервиса.
 // -----------------------------------------------------------------------------
