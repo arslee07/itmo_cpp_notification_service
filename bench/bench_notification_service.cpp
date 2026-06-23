@@ -143,7 +143,7 @@ static void BM_MarkSent(benchmark::State& state) {
 }
 BENCHMARK(BM_MarkSent)->Unit(benchmark::kMicrosecond);
 
-static void BM_Fail_Throughput(benchmark::State& state) {
+static void BM_Fail(benchmark::State& state) {
     auto service = warmMutableService();
     const auto& ids = dataset().sample_ids;
     std::int64_t now = dataset().due_now;
@@ -155,7 +155,7 @@ static void BM_Fail_Throughput(benchmark::State& state) {
         ++i;
     }
 }
-BENCHMARK(BM_Fail_Throughput)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_Fail)->Unit(benchmark::kMicrosecond);
 
 static void BM_CancelledDoNotPoisonDue(benchmark::State& state) {
     auto service = warmMutableService();
@@ -170,18 +170,3 @@ static void BM_CancelledDoNotPoisonDue(benchmark::State& state) {
     }
 }
 BENCHMARK(BM_CancelledDoNotPoisonDue)->Unit(benchmark::kMicrosecond);
-
-static void BM_Due_WithRetries(benchmark::State& state) {
-    auto service = warmMutableService();
-    const auto& d = dataset();
-
-    for (std::size_t i = 0; i < d.sample_ids.size() / 2; ++i) {
-        service->fail(d.sample_ids[i], d.due_now);
-    }
-
-    for (auto _ : state) {
-        auto due = service->due(d.due_now + 10, 100);
-        benchmark::DoNotOptimize(due);
-    }
-}
-BENCHMARK(BM_Due_WithRetries)->Unit(benchmark::kMicrosecond);
