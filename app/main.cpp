@@ -37,6 +37,7 @@ std::string statusToString(itmo_notification::NotificationStatus status) {
     return "unknown";
 }
 
+
 itmo_notification::Notification parseNotification(const json& j) {
     itmo_notification::Notification n;
     n.id            = j.value("id", std::string{});
@@ -48,6 +49,7 @@ itmo_notification::Notification parseNotification(const json& j) {
     n.send_at       = j.value("send_at", std::int64_t{0});
     n.priority      = j.value("priority", 0);
     n.created_at    = j.value("created_at", unixNow());
+    n.attempts      = j.value("attempts", 0);
     return n;
 }
 
@@ -63,6 +65,7 @@ json notificationToJson(const itmo_notification::Notification& n) {
         {"priority", n.priority},
         {"created_at", n.created_at},
         {"status", statusToString(n.status)},
+        {"attempts", n.attempts},
     };
 }
 
@@ -77,6 +80,7 @@ json dueToJson(const itmo_notification::DueNotification& n) {
         {"send_at", n.send_at},
         {"priority", n.priority},
         {"created_at", n.created_at},
+        {"attempts", n.attempts},
     };
 }
 
@@ -137,6 +141,17 @@ int main(int /*argc*/, char** /*argv*/) {
         const std::string id = req.matches[1].str();
         if (!service.markSent(id)) {
             writeJson(res, 404, {{"error", "notification not found or cancelled"}});
+            return;
+        }
+        writeJson(res, 200, {{"ok", true}});
+    });
+
+    server.Post(R"(/v1/notifications/([^/]+)/failed)", [&](const httplib::Request& req,
+                                                           httplib::Response& res) {
+        const std::string id = req.matches[1].str();
+        const std::int64_t now = unixNow();
+        if (!service.fail(id, now)) {
+            writeJson(res, 404, {{"error", "notification not found"}});
             return;
         }
         writeJson(res, 200, {{"ok", true}});

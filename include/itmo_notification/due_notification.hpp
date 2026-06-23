@@ -15,6 +15,7 @@ struct DueNotification {
     std::int64_t send_at{};
     std::int64_t created_at{};
     int          priority{};
+    int          attempts{};
 };
 
 }  // namespace itmo_notification
